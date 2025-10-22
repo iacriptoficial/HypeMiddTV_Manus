@@ -1,0 +1,62 @@
+<analysis>
+The previous AI engineer progressively built a Hyperliquid trading application. Initially, it resolved a critical Order could not immediately match error by switching to  and  with robust fallback, which was successfully fixed after identifying an issue where  returned .
+
+Subsequently, a  segmentation system was implemented, allowing different trading strategies (e.g., IMBA_HYPER, IMBA_TREND, OTHERS) to have distinct rules and filtering on the UI. This involved significant backend modifications for data models, webhook processing, and new API endpoints, alongside a responsive frontend filter interface.
+
+Challenges arose with the filter's auto-refresh mechanism overriding user selections, which was fixed by disabling auto-refresh for filtered views and simplifying the UI. Data inconsistencies required correcting historical webhooks to be classified under OTHERS and synchronizing  between webhook payload and database records.
+
+Most recently, the focus shifted to  strategy, specifically addressing Invalid TP/SL price errors for ETH. After extensive debugging, the root cause was narrowed down to  and specific price handling for ETH, which rejects decimal prices for TP/SL orders while SOL accepts them. This is the immediate problem.
+</analysis>
+
+<product_requirements>
+The application automates Hyperliquid futures trading via TradingView webhooks, focusing on reliable, precise, and customizable trade execution.
+1.  **Core Trading**: Executes market orders, manages positions (closing before new inverse orders), and handles multi-level Take Profits (TP1-TP4) and Stop Loss (SL) as trigger market orders. Includes dynamic precision (, , ).
+2.  **API/UI**: Frontend displays balance, logs, uptime. Supports webhook re-execution, log filtering, and sticky UI elements.
+3.  **Resilience**: Implements rate limit handling and ensures timezone consistency (). Uptime monitoring with database persistence.
+4.  **Strategy Segmentation**: Webhooks are categorized by  (e.g., IMBA_HYPER, IMBA_TREND, OTHERS). Each strategy has custom risk management rules.
+5.  **Dynamic Filters**: Frontend provides interactive filters for webhooks and responses based on , with automatic strategy discovery.
+6.  **Current Problem**:  strategy for ETH fails to place TP/SL orders due to Invalid TP/SL price. asset=4, despite working for SOL and initial debugging showing 1% distance is acceptable for ETH. This is currently under investigation, pointing to asset-specific price precision requirements.
+</product_requirements>
+
+<key_technical_concepts>
+-   **Full-stack**: React.js (frontend), FastAPI (backend), MongoDB (database).
+-   **Hyperliquid SDK**: For trade execution (, , ).
+-   **Webhooks**: TradingView integration,  for rule-based processing.
+-   **Order Management**: Trigger market orders for TP/SL, dynamic price/size precision.
+-   **Asynchronous Tasks**:  for background services (uptime monitor).
+-   **Persistence**: MongoDB for stats (uptime, strategies).
+</key_technical_concepts>
+
+<code_architecture>
+
+-   ****: Stores , , , .  is .
+-   ****:
+    -   **Summary**: Core FastAPI application, handles API, Hyperliquid interaction, logging, background tasks.
+    -   **Changes Made**:
+        -   **Timezone**: Uses  for .
+        -   **Position Management**:  uses / with robust fallback, fixing Order could not immediately match.
+        -   **Strategy Segmentation**: Added  class and  model. Webhook endpoint now parses  from payload, falling back to OTHERS.  uses strategy-specific configs.  and  now store . New API endpoints: , , , . Webhooks and responses endpoints accept  for filtering. Default strategies , ,  defined.
+        -   **TP/SL Logic**:  for size,  for absolute price. , ,  ensure precision. SL/TP are trigger market orders. Removed  from trigger orders with  due to Hyperliquid API rejection (Chat 472-481).  now processes  and  and only uses a single TP.
+        -   **Error Handling**: Enhanced logging for Hyperliquid responses and rate limits.
+-   ****: Stores  for API calls.
+-   ****:
+    -   **Summary**: Main React component for UI.
+    -   **Changes Made**: Displays balance, logs, uptime, webhooks, responses. Implements strategy filtering functionality:  for active strategies,  to fetch strategies and data,  component dynamically renders buttons for each strategy (toggle on/off). Displays  in logs. Removed auto-refresh for webhooks/responses and Select All/Deselect All buttons. Filters now respond immediately on click, with the first filter active by default.
+</code_architecture>
+
+<pending_tasks>
+-   **Investigate Invalid TP/SL price. asset=4 for ETH in IMBA_TREND**: Determine the exact price precision or range requirements for ETH (asset ID 4) stop loss and take profit orders in the Hyperliquid API, given that SOL works with decimals. Dynamically read asset information to apply correct precision rules.
+</pending_tasks>
+
+<current_work>
+Immediately prior to this summary, the AI engineer was deep-diving into the Invalid TP/SL price. asset=4 error, specifically for the  strategy when trading ETH. The user had pointed out that  and  from the webhook were being rejected, despite using a 3% difference, which should be acceptable.
+
+Through a series of tests, the engineer confirmed that  in conjunction with  in trigger orders was problematic and was removed (Chat 472-481). The error was initially traced to  being incorrectly  instead of  for ETH, and later to specific decimal values (e.g., ) being rejected by Hyperliquid for ETH, whereas integer values (e.g., ) worked. However, the user questioned why SOL works with decimals.
+
+The last action was to verify that SOL accepts decimal prices (, ) for SL/TP, while ETH fails with them (, ). The immediate task is to dynamically read this asset-specific information from Hyperliquid to apply the correct price precision based on the asset.
+</current_work>
+
+<optional_next_step>
+Investigate how to dynamically read asset-specific price precision requirements (e.g.,  or ) for ETH and SOL from the Hyperliquid API.
+</optional_next_step>
+
